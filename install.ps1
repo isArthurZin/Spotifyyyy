@@ -1,13 +1,13 @@
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-#region Variables
-$spicetifyFolderPath = "$env:LOCALAPPDATA\spicetify"
-$spicetifyOldFolderPath = "$HOME\spicetify-cli"
-#endregion Variables
+#region Variáveis
+$pastaSpicetify = "$env:LOCALAPPDATA\spicetify"
+$pastaSpicetifyAntiga = "$HOME\spicetify-cli"
+#endregion Variáveis
 
-#region Functions
-function Write-Success {
+#region Funções
+function Escrever-Sucesso {
   [CmdletBinding()]
   param ()
   process {
@@ -15,199 +15,199 @@ function Write-Success {
   }
 }
 
-function Write-Unsuccess {
+function Escrever-Erro {
   [CmdletBinding()]
   param ()
   process {
-    Write-Host -Object ' > ERROR' -ForegroundColor 'Red'
+    Write-Host -Object ' > ERRO' -ForegroundColor 'Red'
   }
 }
 
-function Test-Admin {
+function Testar-Admin {
   [CmdletBinding()]
   param ()
   begin {
-    Write-Host -Object "Chekando o administrador..." -NoNewline
+    Write-Host -Object "Verificando se o script não está sendo executado como administrador..." -NoNewline
   }
   process {
-    $currentUser = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
-    -not $currentUser.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    $usuarioAtual = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
+    -not $usuarioAtual.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
   }
 }
 
-function Test-PowerShellVersion {
+function Testar-VersaoPowerShell {
   [CmdletBinding()]
   param ()
   begin {
-    $PSMinVersion = [version]'5.1'
+    $versaoMinimaPS = [version]'5.1'
   }
   process {
-    Write-Host -Object 'Versao powerSell...' -NoNewline
-    $PSVersionTable.PSVersion -ge $PSMinVersion
+    Write-Host -Object 'Verificando se a versão do PowerShell é compatível...' -NoNewline
+    $PSVersionTable.PSVersion -ge $versaoMinimaPS
   }
 }
 
-function Move-OldSpicetifyFolder {
+function Mover-PastaSpicetifyAntiga {
   [CmdletBinding()]
   param ()
   process {
-    if (Test-Path -Path $spicetifyOldFolderPath) {
-      Write-Host -Object 'Movendo Hackeed...' -NoNewline
-      Copy-Item -Path "$spicetifyOldFolderPath\*" -Destination $spicetifyFolderPath -Recurse -Force
-      Remove-Item -Path $spicetifyOldFolderPath -Recurse -Force
-      Write-Success
+    if (Test-Path -Path $pastaSpicetifyAntiga) {
+      Write-Host -Object 'Movendo a pasta antiga do spicetify...' -NoNewline
+      Copy-Item -Path "$pastaSpicetifyAntiga\*" -Destination $pastaSpicetify -Recurse -Force
+      Remove-Item -Path $pastaSpicetifyAntiga -Recurse -Force
+      Escrever-Sucesso
     }
   }
 }
 
-function Get-Spicetify {
+function Obter-Spicetify {
   [CmdletBinding()]
   param ()
   begin {
     if ($env:PROCESSOR_ARCHITECTURE -eq 'AMD64') {
-      $architecture = 'x64'
+      $arquitetura = 'x64'
     }
     elseif ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') {
-      $architecture = 'arm64'
+      $arquitetura = 'arm64'
     }
     else {
-      $architecture = 'x32'
+      $arquitetura = 'x32'
     }
     if ($v) {
       if ($v -match '^\d+\.\d+\.\d+$') {
-        $targetVersion = $v
+        $versaoAlvo = $v
       }
       else {
-        Write-Warning -Message "You have spicefied an invalid spicetify version: $v `nThe version must be in the following format: 1.2.3"
+        Write-Warning -Message "Você especificou uma versão inválida do spicetify: $v `nA versão deve estar no seguinte formato: 1.2.3"
         Pause
         exit
       }
     }
     else {
-      Write-Host -Object 'Fetching the latest spicetify version...' -NoNewline
-      $latestRelease = Invoke-RestMethod -Uri 'https://api.github.com/repos/spicetify/cli/releases/latest'
-      $targetVersion = $latestRelease.tag_name -replace 'v', ''
-      Write-Success
+      Write-Host -Object 'Buscando a versão mais recente do spicetify...' -NoNewline
+      $releaseMaisRecente = Invoke-RestMethod -Uri 'https://api.github.com/repos/spicetify/cli/releases/latest'
+      $versaoAlvo = $releaseMaisRecente.tag_name -replace 'v', ''
+      Escrever-Sucesso
     }
-    $archivePath = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "spicetify.zip")
+    $caminhoArquivoZip = [System.IO.Path]::Combine([System.IO.Path]::GetTempPath(), "spicetify.zip")
   }
   process {
-    Write-Host -Object "Downloading spicetify v$targetVersion..." -NoNewline
-    $Parameters = @{
-      Uri            = "https://github.com/spicetify/cli/releases/download/v$targetVersion/spicetify-$targetVersion-windows-$architecture.zip"
-      UseBasicParsin = $true
-      OutFile        = $archivePath
+    Write-Host -Object "Baixando spicetify v$versaoAlvo..." -NoNewline
+    $Parametros = @{
+      Uri            = "https://github.com/spicetify/cli/releases/download/v$versaoAlvo/spicetify-$versaoAlvo-windows-$arquitetura.zip"
+      UseBasicParsing = $true
+      OutFile        = $caminhoArquivoZip
     }
-    Invoke-WebRequest @Parameters
-    Write-Success
+    Invoke-WebRequest @Parametros
+    Escrever-Sucesso
   }
   end {
-    $archivePath
+    $caminhoArquivoZip
   }
 }
 
-function Add-SpicetifyToPath {
+function Adicionar-SpicetifyAoPath {
   [CmdletBinding()]
   param ()
   begin {
-    Write-Host -Object 'Making spicetify available in the PATH...' -NoNewline
-    $user = [EnvironmentVariableTarget]::User
-    $path = [Environment]::GetEnvironmentVariable('PATH', $user)
+    Write-Host -Object 'Tornando o spicetify disponível no PATH...' -NoNewline
+    $usuario = [EnvironmentVariableTarget]::User
+    $path = [Environment]::GetEnvironmentVariable('PATH', $usuario)
   }
   process {
-    $path = $path -replace "$([regex]::Escape($spicetifyOldFolderPath))\\*;*", ''
-    if ($path -notlike "*$spicetifyFolderPath*") {
-      $path = "$path;$spicetifyFolderPath"
+    $path = $path -replace "$([regex]::Escape($pastaSpicetifyAntiga))\\*;*", ''
+    if ($path -notlike "*$pastaSpicetify*") {
+      $path = "$path;$pastaSpicetify"
     }
   }
   end {
-    [Environment]::SetEnvironmentVariable('PATH', $path, $user)
+    [Environment]::SetEnvironmentVariable('PATH', $path, $usuario)
     $env:PATH = $path
-    Write-Success
+    Escrever-Sucesso
   }
 }
 
-function Install-Spicetify {
+function Instalar-Spicetify {
   [CmdletBinding()]
   param ()
   begin {
-    Write-Host -Object 'Installing spicetify...'
+    Write-Host -Object 'Instalando o spicetify...'
   }
   process {
-    $archivePath = Get-Spicetify
-    Write-Host -Object 'Extracting spicetify...' -NoNewline
-    Expand-Archive -Path $archivePath -DestinationPath $spicetifyFolderPath -Force
-    Write-Success
-    Add-SpicetifyToPath
+    $caminhoArquivoZip = Obter-Spicetify
+    Write-Host -Object 'Extraindo spicetify...' -NoNewline
+    Expand-Archive -Path $caminhoArquivoZip -DestinationPath $pastaSpicetify -Force
+    Escrever-Sucesso
+    Adicionar-SpicetifyAoPath
   }
   end {
-    Remove-Item -Path $archivePath -Force -ErrorAction 'SilentlyContinue'
-    Write-Host -Object 'spicetify was successfully installed!' -ForegroundColor 'Green'
+    Remove-Item -Path $caminhoArquivoZip -Force -ErrorAction 'SilentlyContinue'
+    Write-Host -Object 'O spicetify foi instalado com sucesso!' -ForegroundColor 'Green'
   }
 }
-#endregion Functions
+#endregion Funções
 
-#region Main
-#region Checks
-if (-not (Test-PowerShellVersion)) {
-  Write-Unsuccess
-  Write-Warning -Message 'PowerShell 5.1 or higher is required to run this script'
-  Write-Warning -Message "You are running PowerShell $($PSVersionTable.PSVersion)"
-  Write-Host -Object 'PowerShell 5.1 install guide:'
+#region Principal
+#region Verificações
+if (-not (Testar-VersaoPowerShell)) {
+  Escrever-Erro
+  Write-Warning -Message 'É necessário o PowerShell 5.1 ou superior para executar este script'
+  Write-Warning -Message "Você está executando o PowerShell $($PSVersionTable.PSVersion)"
+  Write-Host -Object 'Guia de instalação do PowerShell 5.1:'
   Write-Host -Object 'https://learn.microsoft.com/skypeforbusiness/set-up-your-computer-for-windows-powershell/download-and-install-windows-powershell-5-1'
-  Write-Host -Object 'PowerShell 7 install guide:'
+  Write-Host -Object 'Guia de instalação do PowerShell 7:'
   Write-Host -Object 'https://learn.microsoft.com/powershell/scripting/install/installing-powershell-on-windows'
   Pause
   exit
 }
 else {
-  Write-Success
+  Escrever-Sucesso
 }
-if (-not (Test-Admin)) {
-  Write-Unsuccess
-  Write-Warning -Message "The script was run as administrator. This can result in problems with the installation process or unexpected behavior. Do not continue if you do not know what you are doing."
+if (-not (Testar-Admin)) {
+  Escrever-Erro
+  Write-Warning -Message "O script foi executado como administrador. Isso pode resultar em problemas com o processo de instalação ou comportamento inesperado. Não continue se você não souber o que está fazendo."
   $Host.UI.RawUI.Flushinputbuffer()
-  $choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
-    (New-Object System.Management.Automation.Host.ChoiceDescription '&Yes', 'Abort installation.'),
-    (New-Object System.Management.Automation.Host.ChoiceDescription '&No', 'Resume installation.')
+  $opcoes = [System.Management.Automation.Host.ChoiceDescription[]] @(
+    (New-Object System.Management.Automation.Host.ChoiceDescription '&Sim', 'Abortar instalação.'),
+    (New-Object System.Management.Automation.Host.ChoiceDescription '&Não', 'Continuar com a instalação.')
   )
-  $choice = $Host.UI.PromptForChoice('', 'Do you want to abort the installation process?', $choices, 0)
-  if ($choice -eq 0) {
-    Write-Host -Object 'spicetify installation aborted' -ForegroundColor 'Yellow'
+  $escolha = $Host.UI.PromptForChoice('', 'Você deseja abortar o processo de instalação?', $opcoes, 0)
+  if ($escolha -eq 0) {
+    Write-Host -Object 'Instalação do spicetify abortada' -ForegroundColor 'Yellow'
     Pause
     exit
   }
 }
 else {
-  Write-Success
+  Escrever-Sucesso
 }
-#endregion Checks
+#endregion Verificações
 
 #region Spicetify
-Move-OldSpicetifyFolder
-Install-Spicetify
-Write-Host -Object "`nRun" -NoNewline
+Mover-PastaSpicetifyAntiga
+Instalar-Spicetify
+Write-Host -Object "`nExecute" -NoNewline
 Write-Host -Object ' spicetify -h ' -NoNewline -ForegroundColor 'Cyan'
-Write-Host -Object 'to get started'
+Write-Host -Object 'para começar'
 #endregion Spicetify
 
 #region Marketplace
 $Host.UI.RawUI.Flushinputbuffer()
-$choices = [System.Management.Automation.Host.ChoiceDescription[]] @(
-    (New-Object System.Management.Automation.Host.ChoiceDescription "&Yes", "Install Spicetify Marketplace."),
-    (New-Object System.Management.Automation.Host.ChoiceDescription "&No", "Do not install Spicetify Marketplace.")
+$opcoes = [System.Management.Automation.Host.ChoiceDescription[]] @(
+    (New-Object System.Management.Automation.Host.ChoiceDescription "&Sim", "Instalar o Marketplace do Spicetify."),
+    (New-Object System.Management.Automation.Host.ChoiceDescription "&Não", "Não instalar o Marketplace do Spicetify.")
 )
-$choice = $Host.UI.PromptForChoice('', "`nDo you also want to install Spicetify Marketplace? It will become available within the Spotify client, where you can easily install themes and extensions.", $choices, 0)
-if ($choice -eq 1) {
-  Write-Host -Object 'spicetify Marketplace installation aborted' -ForegroundColor 'Yellow'
+$escolha = $Host.UI.PromptForChoice('', "`nVocê também deseja instalar o Marketplace do Spicetify? Ele se tornará disponível dentro do cliente Spotify, onde você pode facilmente instalar temas e extensões.", $opcoes, 0)
+if ($escolha -eq 1) {
+  Write-Host -Object 'Instalação do Marketplace do spicetify abortada' -ForegroundColor 'Yellow'
 }
 else {
-  Write-Host -Object 'Starting the spicetify Marketplace installation script..'
-  $Parameters = @{
+  Write-Host -Object 'Iniciando o script de instalação do Marketplace do spicetify..'
+  $Parametros = @{
     Uri             = 'https://raw.githubusercontent.com/spicetify/spicetify-marketplace/main/resources/install.ps1'
     UseBasicParsing = $true
   }
-  Invoke-WebRequest @Parameters | Invoke-Expression
+  Invoke-WebRequest @Parametros | Invoke-Expression
 }
 #endregion Marketplace
-#endregion Main
+#endregion Principal
